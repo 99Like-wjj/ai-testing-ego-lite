@@ -1,5 +1,13 @@
 # 更新记录 / Changelog
 
+## 0.2.2 / report-performance-1 — 2026-11-16 · 正式版本
+
+- 报告与用例审阅页共享一次性主数据读取；默认中文未配置 presentation 时不再反复解析报告 JSON。
+- 完整记录与历史事实按首次展开渲染；步骤／证据切换局部更新，复用步骤投影、目录、概览与原始记录 DOM，原动作中的证据通过链接追溯。
+- bundle 的普通截图改为受限相对附件路径，浏览器按需加载原图；inline 保持单 HTML 并复用 Blob 图片地址。测试附件下载的有界字节副本继续保留。
+- 主存储 v9、知识 v3、回归 v2、交付清单 v2 保持；HTML 图片资产增加可选 attachmentPath。旧 HTML 精确校验使用原修订；另存新报告才应用新阅读器，不改写历史和原件。
+- 核实过程、优化取舍、工程自测与真实浏览器合成测量见[0.2.2 方案与验证](docs/v0.2.2-report-performance.md)。正式发布验证与限制见[发布验证](docs/v0.2.2-release-validation.md)；发布不会自动更新用户本机。
+
 ## 0.2.1 / attachments-review-2 — 2026-11-06 · 正式版本
 
 - 人工审核通过后已发布 [v0.2.1](https://github.com/99Like-wjj/ai-testing-ego-lite/releases/tag/v0.2.1)，固定提交为 `5bccc9c8aa0402c7d03f986793050d6617bacc4b`。发布后的文档状态修正仅更新 main，不移动 Tag 或替换安装附件；发布准备与候选阶段记录保留各自历史范围。

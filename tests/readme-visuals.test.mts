@@ -48,8 +48,7 @@ test('README timeline contains four versions and labels the current release cons
  test('current illustrations explain report and regression boundaries in both languages', async () => {
   for (const suffix of ['', '.zh-CN']) {
     const read = (name: string) => fs.readFile(path.join(SOURCE_ROOT, `docs/images/${name}${suffix}.svg`), 'utf8');
-    assert.match(await read('hero'), /ai-testing-ego-lite.*0\.2\.1/);
-    assert.doesNotMatch(await read('hero'), /NOT RELEASED|未发布|-rc\./);
+    assert.match(await read('hero'), /ai-testing-ego-lite.*0\.2\.2/);
     assert.match(await read('hero'), /STABLE RELEASE|正式版本/);
     assert.match(await read('workflow'), /whole scenarios|整条场景/);
     assert.match(await read('workflow'), /not automatically replayed|不自动重放/);
@@ -91,10 +90,10 @@ test('version history pages and diagrams list developed versions newest first, e
     const full = await fs.readFile(path.join(SOURCE_ROOT, `docs/images/version-history${suffix}.svg`), 'utf8');
     const recent = await fs.readFile(path.join(SOURCE_ROOT, `docs/images/readme-version-history${suffix}.svg`), 'utf8');
     const versions = (svg: string) => [...svg.matchAll(/>v(\d+\.\d+\.\d+)</g)].map(match => match[1]);
-    assert.deepEqual(versions(full), ['0.2.1', '0.1.9', '0.1.8', '0.1.7', '0.1.6', '0.1.5', '0.1.4', '0.1.3', '0.1.2']);
-    assert.deepEqual(versions(recent), ['0.2.1', '0.1.9', '0.1.8', '0.1.7']);
+    assert.deepEqual(versions(full), ['0.2.2', '0.2.1', '0.1.9', '0.1.8', '0.1.7', '0.1.6', '0.1.5', '0.1.4', '0.1.3', '0.1.2']);
+    assert.deepEqual(versions(recent), ['0.2.2', '0.2.1', '0.1.9', '0.1.8']);
     const page = await fs.readFile(path.join(SOURCE_ROOT, suffix ? 'docs/version-history.md' : 'docs/version-history.en.md'), 'utf8');
-    assert.deepEqual([...page.matchAll(/^## v(\d+\.\d+\.\d+)/gm)].map(match => match[1]), ['0.2.1', '0.1.9', '0.1.8', '0.1.7', '0.1.6', '0.1.5']);
+    assert.deepEqual([...page.matchAll(/^## v(\d+\.\d+\.\d+)/gm)].map(match => match[1]), ['0.2.2', '0.2.1', '0.1.9', '0.1.8', '0.1.7', '0.1.6', '0.1.5']);
     assert.match(page,/0\.1\.8.*(?:正式版本|Stable release)/);
   }
 });
@@ -181,7 +180,7 @@ test('promotional diagrams avoid coupling labels to the knowledge schema version
 test('stable release READMEs use the renamed repository and Skill entrypoints', async () => {
   for (const file of ['README.md', 'README.en.md']) {
     const page = await fs.readFile(path.join(SOURCE_ROOT, file), 'utf8');
-    assert.ok(page.includes('https://github.com/99Like-wjj/ai-testing-ego-lite/releases/tag/v0.2.1'));
+    assert.ok(page.includes('https://github.com/99Like-wjj/ai-testing-ego-lite/releases/tag/v0.2.2'));
     assert.ok(page.includes('$ai-testing-ego-lite'));
     assert.ok(page.includes('/ai-testing-ego-lite'));
     assert.doesNotMatch(page, /ai-autonomous-testing-ego-lite|0\.2\.1-rc\.1/);

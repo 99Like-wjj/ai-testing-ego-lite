@@ -24,6 +24,10 @@
 
 ## 从旧版更新
 
+### 0.2.2 报告性能版本
+
+0.2.2 的 revision 为 `report-performance-1`。主存储 v9、知识 v3、回归 v2 和交付清单 v2 不变。旧 HTML 不自动升级；需要新阅读器时另存到新目录，不覆盖历史报告。bundle 必须携带完整 `attachments/` 目录一起移动，inline 仍为可独立打开的单 HTML；原始图片、哈希及证据关联保留。
+
 ### 0.2.1 名称替换
 
 仓库、包名和新 Skill 目录已统一为 `ai-testing-ego-lite`；下载附件为 `ai-testing-ego-lite-0.2.1.zip`，版本为 `0.2.1`，revision 为 `attachments-review-2`。旧 `ai-autonomous-testing-ego-lite` 名称不提供调用兼容入口。中文展示名为“AI 自动化测试 · Ego Lite”。

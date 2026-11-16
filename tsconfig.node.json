@@ -16,6 +16,7 @@
     "tools/observation-fixture.mts",
     "tools/network-fixture.mts",
     "tools/report-v017-fixture.mts",
+    "tools/report-performance.mts",
     "docs/images/render.mts",
     "tools/bundle-file-readers.mts",
     "tools/bundle-review-ui.mts",

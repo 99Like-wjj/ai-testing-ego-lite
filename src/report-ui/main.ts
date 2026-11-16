@@ -1,4 +1,4 @@
-import { uiText as u, uiMarkup, uiHtml, uiTemplate, presentationLanguage, formatUi } from '../report/ui-text.mjs';
+import { uiText as u, uiMarkup, uiHtml, uiTemplate, presentationLanguage, formatUi, readEmbeddedData } from '../report/ui-text.mjs';
 import { modelHeader } from '../report/model-display.mjs';
 import { scopeLabel } from '../report/scope-label.mjs';
 import { createConversationReader, stepConversations, renderStepConversationSummary } from './conversations.js';
@@ -129,7 +129,7 @@ Object.assign(globalThis,{reportViewModel,conversationViewModel:{stepConversatio
     for(const a of Object.values(v.assets))if(!object(a)||!number(a.bytes)||!number(a.retainedBytes)||(a.kind==='text'&&typeof a.text!=='string'))throw new Error(u('报告内容结构无效。'));
   }
   let payload:Payload;
-  try {const v:unknown=JSON.parse($('#report-data').textContent??'');assertPayload(v);payload=v;}
+  try {const v:unknown=readEmbeddedData('report-data');assertPayload(v);payload=v;}
   catch(e){$('#detail').innerHTML=`<section class="panel error">${esc(e instanceof Error?e.message:u('无法读取报告。'))}</section>`;return;}
   const report=payload.report;
   const evidenceMap=new Map(report.evidenceCatalog.items.map(e=>[e.id,e]));
@@ -155,13 +155,63 @@ Object.assign(globalThis,{reportViewModel,conversationViewModel:{stepConversatio
       const view=payload.conversations?.[id];if(!view)return false;
       if(!ids.length)return view.evidenceId?evidenceMap.has(view.evidenceId):state.view==='scene'&&state.selectedCase===view.caseId&&state.goalId===view.goalId;
       const row=rows.find(r=>r.c.id===state.selectedCase&&r.g.id===state.goalId);if(!row||state.view!=='scene')return false;
-      const step=reportViewModel.steps(row.c,row.g.id,report.evidenceCatalog.items,readerNote(row.c.id,row.g.id)).items.find(s=>s.key===state.stepKey);
+      const step=stepsFor(row).items.find(s=>s.key===state.stepKey);
       if(!step)return false;const refs=stepConversations(payload,row.c.id,row.g.id,step.observationId,step.actionId,step.conversations);
       return refs.some(r=>r.viewId===id&&ids.every(message=>r.messageIds.includes(message)));
     },
     openEvidence:id=>openEvidence(id,u('对话原始来源'),document.activeElement instanceof HTMLElement?document.activeElement:$('#detail'))
   });
   const sceneOpen=new Set<string>(),goalOpen=new Set<string>(),readingOpen=new Set<string>();
+  type StepView=ReturnType<typeof reportViewModel.steps>;
+  const stepViews=new Map<Row,StepView>();
+  function stepsFor(row:Row):StepView {
+    let view=stepViews.get(row);
+    if(!view){view=reportViewModel.steps(row.c,row.g.id,report.evidenceCatalog.items,readerNote(row.c.id,row.g.id));stepViews.set(row,view);}
+    return view;
+  }
+  function currentRow():Row|undefined{return state.view==='scene'?rows.find(r=>r.c.id===state.selectedCase&&r.g.id===state.goalId):undefined;}
+  let lazyId=0;
+  const lazySections=new Map<string,()=>string>();
+  function lazyDetails(summary:string,content:()=>string,attributes=''):string {
+    const id=String(++lazyId);lazySections.set(id,content);
+    return `<details ${attributes} data-lazy-section="${id}"><summary>${summary}</summary></details>`;
+  }
+  function materialize(d:HTMLDetailsElement):void {
+    const id=d.dataset.lazySection,content=id?lazySections.get(id):undefined;
+    if(!d.open||!content)return;
+    lazySections.delete(id!);d.insertAdjacentHTML('beforeend',content());d.dataset.lazyLoaded='true';
+    bindReading(d);
+  }
+  function releaseSections(root:HTMLElement):void {
+    root.querySelectorAll<HTMLElement>('[data-lazy-section]').forEach(d=>lazySections.delete(d.dataset.lazySection!));
+  }
+  /** Structural paths stay stable when the children of a disclosure are materialized. */
+  function bindReading(root:HTMLElement):void {
+    root.querySelectorAll<HTMLDetailsElement>('details:not(.goal-card)').forEach(d=>{
+      if(!d.dataset.readingKey){
+        const owner=d.closest<HTMLElement>('[data-owner-case][data-owner-goal]'),proof=d.closest('.proof-stage'),step=d.closest('.step-proof-panel');
+        const scope=owner?owner.dataset.ownerCase+'/'+owner.dataset.ownerGoal+(proof?'/'+state.stepKey+'/'+state.proofId:step?'/'+state.stepKey:'/records'):state.view+'/'+state.selectedCase;
+        const parts:string[]=[];let el:Element|null=d;
+        while(el&&el!==owner&&el.id!=='detail'){parts.push(el.tagName+':'+Array.from(el.parentElement?.children??[]).indexOf(el));el=el.parentElement;}
+        d.dataset.readingKey=scope+'/'+parts.reverse().join('/');
+        d.open=readingOpen.has(d.dataset.readingKey);
+      }
+      if(d.open)materialize(d);
+    });
+  }
+  function updateStep(row:Row):void {
+    const view=stepsFor(row),selected=view.items.find(s=>s.key===state.stepKey);if(!selected)return;
+    const panel=$('.step-proof-panel');releaseSections(panel);panel.innerHTML=stepProof(row,view,selected);
+    document.querySelectorAll<HTMLElement>('.actual-step[data-step-key]').forEach(b=>b.setAttribute('aria-current',b.dataset.stepKey===state.stepKey?'step':'false'));
+    bindReading(panel);panel.scrollTo(0,0);
+  }
+  function updateProof(row:Row,id:string):void {
+    const view=stepsFor(row),step=view.items.find(s=>s.key===state.stepKey),ids=step?.evidenceIds??view.unassignedEvidenceIds;
+    if(!ids.includes(id)||id===state.proofId)return;
+    state.proofId=id;const stage=$('.proof-stage');releaseSections(stage);stage.innerHTML=evidenceCard(id);
+    document.querySelectorAll<HTMLElement>('[data-proof-id]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.proofId===id)));
+    bindReading(stage);
+  }
   const readerScope=location.pathname+'|'+report.runId+'|'+report.revision+'|'+report.evidenceRevision;
   let entryKey=String(Date.now())+'-'+Math.random().toString(36).slice(2),locationFingerprint='';
   function hi(v:unknown):string{const text=String(v??''),q=state.query;if(!q)return esc(text);const i=text.toLocaleLowerCase().indexOf(q.toLocaleLowerCase());return i<0?esc(text):esc(text.slice(0,i))+'<mark>'+esc(text.slice(i,i+q.length))+'</mark>'+esc(text.slice(i+q.length));}
@@ -210,14 +260,14 @@ Object.assign(globalThis,{reportViewModel,conversationViewModel:{stepConversatio
       previous.map(({n,p})=>'<article class="fact"><h4>'+esc(n.ref.runId)+(h.primaryBaseline?.runId===n.ref.runId&&h.primaryBaseline.resultsSha256===n.ref.resultsSha256?u(' · 主要比较基准'):'')+'</h4><p>'+(p.selected?p.status?badge(p.status):u('缺少评估'):u('该运行未选中此点'))+'</p><p class="text">'+esc(p.rationale??u('无正式判断'))+uiMarkup('</p><p><strong>当时预期：</strong>')+esc(p.expected)+uiMarkup('</p><p class="meta">用例 v')+n.caseVersion+u(' · 原编号 ')+esc(p.pointId)+u(' · 结果 revision ')+n.ref.resultsRevision+'</p>'+
         '<p class="hint">'+(definition&&p.definitionSha256?(definition===p.definitionSha256?u('目标与必要计划指纹一致；环境、对象及数据仍须分别核对。'):u('目标或必要计划发生变化，不能直接把状态变化认定为代码修复。')):u('定义可比性尚需核对。'))+'</p>'+
         (p.gaps.length?'<p class="note">'+esc(p.gaps.join('；'))+'</p>':'')+
-        uiMarkup('<details><summary>查看原始现场与证据 · ')+p.evidenceKeys.length+uiMarkup(' 项</summary>')+evidenceGrid(p.evidenceKeys,u('历史运行 ')+n.ref.runId)+'<pre class="body-text">'+esc(JSON.stringify({assessment:p.assessment,observations:p.observations,actions:p.actions,contexts:p.contexts,findings:p.findings,definition:p.definition,plan:p.plan,sourceDefinitions:p.sourceDefinitions,declaredConditions:p.declaredConditions,parameterBindings:p.parameterBindings,source:n.ref,definitionSha256:p.definitionSha256},null,2))+'</pre></details></article>').join('')+
+        lazyDetails(uiMarkup('查看原始现场与证据 · ')+p.evidenceKeys.length+u(' 项'),()=>evidenceGrid(p.evidenceKeys,u('历史运行 ')+n.ref.runId)+'<pre class="body-text">'+esc(JSON.stringify({assessment:p.assessment,observations:p.observations,actions:p.actions,contexts:p.contexts,findings:p.findings,definition:p.definition,plan:p.plan,sourceDefinitions:p.sourceDefinitions,declaredConditions:p.declaredConditions,parameterBindings:p.parameterBindings,source:n.ref,definitionSha256:p.definitionSha256},null,2))+'</pre>')+ '</article>').join('')+
       (checks.length?uiMarkup('<h4>原问题检查（独立于目标四态）</h4>')+checks.map(c=>'<article class="fact"><strong>'+esc(checkLabels[c.state])+'</strong><p class="text">'+esc(c.rationale)+uiMarkup('</p><p class="meta">来源 ')+esc(c.source.run.runId+' / '+c.source.caseId+' / '+(c.source.findingId??c.source.goalId??''))+'</p>'+(c.gaps.length?'<p class="note">'+esc(c.gaps.join('；'))+'</p>':'')+'</article>').join(''):uiMarkup('<p class="hint">尚未登记原问题检查，不能仅凭本轮通过认定每条原问题已修复。</p>'))+
       (h.gaps.length?uiMarkup('<details open><summary>历史资料不完整 · ')+h.gaps.length+uiMarkup(' 项</summary>')+h.gaps.map(g=>'<p class="note">'+esc(g.run.runId+'：'+g.reason)+'</p>').join('')+'</details>':'')+'</section>';
   }
   function goalWorkbench(row:Row):string{
-    const {c,g,a}=row,note=readerNote(c.id,g.id),view=reportViewModel.steps(c,g.id,report.evidenceCatalog.items,note),items=view.items;
+    const {c,g,a}=row,note=readerNote(c.id,g.id),view=stepsFor(row),items=view.items;
     const selected=items.find(s=>s.key===state.stepKey)??items.find(s=>s.focus)??items[0];state.stepKey=selected?.key??'';
-    const index=selected?items.indexOf(selected):-1,focusIndex=items.findIndex(s=>s.focus),ids=selected?.evidenceIds??view.unassignedEvidenceIds;
+    const focusIndex=items.findIndex(s=>s.focus),ids=selected?.evidenceIds??view.unassignedEvidenceIds;
     if(!ids.includes(state.proofId))state.proofId=ids[0]??'';
     const displayActual=note?.description??a?.display?.actual;
     const actual=displayActual??(row.status==='not_tested'?a?.rationale:undefined)??(row.observations.map(o=>o.actual??o.summary).join('；')||u('尚未登记实际现象；不能从计划或判断补造。'));
@@ -227,16 +277,45 @@ Object.assign(globalThis,{reportViewModel,conversationViewModel:{stepConversatio
     const dimensionLabel=dimension?({business:u('业务结果'),interaction:u('交互行为'),wording:u('文案'),content:u('回复内容'),presentation:u('展示')}[dimension]):undefined;
     const warnings=prompts.filter(p=>p.caseId===c.id&&p.goalId===g.id);
     const stepTitle=row.status==='not_tested'?u('已记录的准备与观察'):u('实际操作步骤');
+    return uiHtml`<section class="panel goal-workbench" id="goal-${esc(c.id)}-${esc(g.id)}" data-owner-case="${esc(c.id)}" data-owner-goal="${esc(g.id)}"><header class="goal-overview"><div class="goal-heading"><span class="inline-id">${esc(g.pointId+' · '+c.id+'/'+g.id)}</span><span class="original-title">${esc(g.title)}</span>${badge(row.status)}</div><h2>${hi(title)}</h2><p class="goal-description"><strong>${descriptionLabel}：</strong>${hi(actual)}</p>${impact?`<p class="goal-description"><strong>${dimensionLabel??u('影响')}：</strong>${hi(impact)}</p>`:''}${warnings.length?uiHtml`<details class="reading-quality"><summary>记录可读性与取证提示 · ${warnings.length}项</summary>${warnings.map(p=>`<p class="hint">${esc(p.detail)}</p>`).join('')}<p class="meta">仅提示记录缺口，不改变目标状态。</p></details>`:''}<div class="goal-expected"><strong>预期结果</strong><p class="text">${hi(g.expected)}</p></div>${a?.gaps.length?`<div class="note">${row.status==='not_tested'?u('未测试原因与剩余条件'):u('尚存事实缺口')}：${hi(a.gaps.join('；'))}</div>`:''}${linkedNotice?`<p class="step-warning">${esc(linkedNotice)}</p>`:''}<div class="goal-focus"><span class="${row.status==='violation'&&focusIndex>=0?'problem-location':''}">${focusIndex>=0?(row.status==='violation'?u('问题位于'):u('核验位置'))+u('第 ')+(focusIndex+1)+u(' 步'):row.status==='violation'?u('原记录未明确定位问题步骤'):items.length+u(' 个已记录操作片段')}</span><button data-section="original-records-${esc(c.id)}-${esc(g.id)}">前提、原始判断与来源 ↓</button></div></header><div class="workbench-body"><nav class="actual-step-list" aria-label="实际操作步骤"><h3>${stepTitle}<span>${items.length} 步</span></h3>${items.map((s,i)=>`<button class="actual-step ${s.focus&&row.status==='violation'?'problem':''}" data-step-key="${esc(s.key)}" aria-current="${s===selected?'step':'false'}"><span class="number">${i+1}</span><span><strong>${hi(s.title)}</strong><span class="step-label">${s.focus?(row.status==='violation'?u('● 问题步骤'):u('核验位置')):s.evidenceIds.length?u('已记录 · ')+s.evidenceIds.length+u(' 份引用'):u('未关联独立证据')}${s.sharedEvidenceIds.length?u(' · 含共享引用'):''}</span></span></button>`).join('')||uiMarkup('<p class="step-list-note">没有留存逐步动作；不会把冻结计划补成已执行步骤。</p>')}<p class="step-list-note">步骤不是新增测试目标。切换一步，右侧只展示该步引用的证据。</p></nav><section class="step-proof-panel">${stepProof(row,view,selected)}</section></div></section>${lazyDetails(u('执行前提、原始判断与完整记录'),()=>uiHtml`${note?uiHtml`<section class="fact"><h3>阅读整理来源</h3><p class="text">${hi(note.limitations.join('；'))}</p><p class="meta">来源：${esc(note.sourceLabels.join('、'))}</p><pre class="body-text">${esc(JSON.stringify(note,null,2))}</pre></section>`:''}${goalContent(row)}`, `class="panel goal-records" id="original-records-${esc(c.id)}-${esc(g.id)}" data-owner-case="${esc(c.id)}" data-owner-goal="${esc(g.id)}"`)}`;
+  }
+  function stepProof(row:Row,view:StepView,selected:StepView['items'][number]|undefined):string {
+    const {c,g}=row,items=view.items,index=selected?items.indexOf(selected):-1,ids=selected?.evidenceIds??view.unassignedEvidenceIds;
+    if(!ids.includes(state.proofId))state.proofId=ids[0]??'';
     const readback=selected?.result;
     const conversationRefs=selected?stepConversations(payload,c.id,g.id,selected.observationId,selected.actionId,selected.conversations):[];
-    return uiHtml`<section class="panel goal-workbench" id="goal-${esc(c.id)}-${esc(g.id)}" data-owner-case="${esc(c.id)}" data-owner-goal="${esc(g.id)}"><header class="goal-overview"><div class="goal-heading"><span class="inline-id">${esc(g.pointId+' · '+c.id+'/'+g.id)}</span><span class="original-title">${esc(g.title)}</span>${badge(row.status)}</div><h2>${hi(title)}</h2><p class="goal-description"><strong>${descriptionLabel}：</strong>${hi(actual)}</p>${impact?`<p class="goal-description"><strong>${dimensionLabel??u('影响')}：</strong>${hi(impact)}</p>`:''}${warnings.length?uiHtml`<details class="reading-quality"><summary>记录可读性与取证提示 · ${warnings.length}项</summary>${warnings.map(p=>`<p class="hint">${esc(p.detail)}</p>`).join('')}<p class="meta">仅提示记录缺口，不改变目标状态。</p></details>`:''}<div class="goal-expected"><strong>预期结果</strong><p class="text">${hi(g.expected)}</p></div>${a?.gaps.length?`<div class="note">${row.status==='not_tested'?u('未测试原因与剩余条件'):u('尚存事实缺口')}：${hi(a.gaps.join('；'))}</div>`:''}${linkedNotice?`<p class="step-warning">${esc(linkedNotice)}</p>`:''}<div class="goal-focus"><span class="${row.status==='violation'&&focusIndex>=0?'problem-location':''}">${focusIndex>=0?(row.status==='violation'?u('问题位于'):u('核验位置'))+u('第 ')+(focusIndex+1)+u(' 步'):row.status==='violation'?u('原记录未明确定位问题步骤'):items.length+u(' 个已记录操作片段')}</span><button data-section="original-records-${esc(c.id)}-${esc(g.id)}">前提、原始判断与来源 ↓</button></div></header><div class="workbench-body"><nav class="actual-step-list" aria-label="实际操作步骤"><h3>${stepTitle}<span>${items.length} 步</span></h3>${items.map((s,i)=>`<button class="actual-step ${s.focus&&row.status==='violation'?'problem':''}" data-step-key="${esc(s.key)}" aria-current="${s===selected?'step':'false'}"><span class="number">${i+1}</span><span><strong>${hi(s.title)}</strong><span class="step-label">${s.focus?(row.status==='violation'?u('● 问题步骤'):u('核验位置')):s.evidenceIds.length?u('已记录 · ')+s.evidenceIds.length+u(' 份引用'):u('未关联独立证据')}${s.sharedEvidenceIds.length?u(' · 含共享引用'):''}</span></span></button>`).join('')||uiMarkup('<p class="step-list-note">没有留存逐步动作；不会把冻结计划补成已执行步骤。</p>')}<p class="step-list-note">步骤不是新增测试目标。切换一步，右侧只展示该步引用的证据。</p></nav><section class="step-proof-panel"><div class="step-proof-header"><h3>${selected?u('第 ')+(index+1)+u(' 步 · ')+hi(selected.title):u('目标级证据与观察')}</h3><span>${selected?(index+1)+' / '+items.length:u('无逐步动作记录')}</span></div>${selected?`${selected.description!==selected.title?`<p class="actual-description text">${hi(selected.description)}</p>`:''}${renderStepConversationSummary(payload,selected,conversationRefs)}${stepTestFiles(payload,c.id,g.id,selected.observationId,selected.actionId)}${readback?`<div class="step-readback ${selected.focus&&row.status==='violation'?'problem':''}"><strong>${selected.focus&&row.status==='violation'?u('问题现场记录'):u('实际结果记录')}</strong><span>${hi(readback)}</span></div>`:''}${selected.note?`<p class="step-warning">${hi(selected.note)}</p>`:''}${selected.sharedEvidenceIds.length?uiMarkup('<p class="step-warning">原记录将部分材料共同关联到多个步骤；共享引用不等于逐步独立截图。</p>'):''}${selected.arranged?uiMarkup('<p class="reader-note-origin">步骤标题与证据位置依据既有记录整理；原操作文本及业务结论未改。</p>'):''}`:`<div class="reader-empty"><strong>${row.status==='not_tested'?u('本目标未完成实际检查'):u('未留存逐步动作')}</strong>${row.status==='not_tested'?u('以下材料仅对应已登记准备或缺口，不表示该目标已验证。'):u('只展示目标关联材料，不将其分配给虚构步骤。')}</div>`}${ids.length?uiHtml`<div class="proof-tabs" role="tablist" aria-label="本步证据">${ids.map((id,i)=>`<button data-proof-id="${esc(id)}" role="tab" aria-selected="${state.proofId===id}">${esc(kindLabels[evidenceMap.get(id)?.kind??'other'])} ${i+1}</button>`).join('')}</div><div class="proof-stage" data-proof-step="${esc(selected?.key??'')}">${evidenceCard(state.proofId)}</div>`:uiMarkup('<div class="reader-empty"><strong>此步没有独立关联的截图或响应文件</strong>保留原记录的资料缺口，不使用其他时刻的图片冒充这一步现场。</div>')}${selected?uiHtml`<p class="step-meta">操作发生时间：${time(selected.occurredAt)} · ${esc(selected.actionId)}</p>`:''}${view.unassignedEvidenceIds.length&&selected?uiHtml`<details class="step-unassigned"><summary>目标级其他证据 · ${view.unassignedEvidenceIds.length} 项（未分配到当前步骤）</summary><p class="hint">材料仍保留，不自动当作该步证据。</p>${evidenceButtons(view.unassignedEvidenceIds,u('目标级引用'))}</details>`:''}${!selected&&row.observations.length?uiHtml`<details class="step-goal-observations"><summary>查看已登记的目标观察</summary>${row.observations.map(o=>`<p class="text">${hi(o.actual??o.summary)}</p>`).join('')}</details>`:''}</section></div></section><details class="panel goal-records" id="original-records-${esc(c.id)}-${esc(g.id)}" data-owner-case="${esc(c.id)}" data-owner-goal="${esc(g.id)}"><summary>执行前提、原始判断与完整记录</summary>${note?uiHtml`<section class="fact"><h3>阅读整理来源</h3><p class="text">${hi(note.limitations.join('；'))}</p><p class="meta">来源：${esc(note.sourceLabels.join('、'))}</p><pre class="body-text">${esc(JSON.stringify(note,null,2))}</pre></section>`:''}${goalContent(row)}</details>`;
+    return uiHtml`<div class="step-proof-header"><h3>${selected?u('第 ')+(index+1)+u(' 步 · ')+hi(selected.title):u('目标级证据与观察')}</h3><span>${selected?(index+1)+' / '+items.length:u('无逐步动作记录')}</span></div>${selected?`${selected.description!==selected.title?`<p class="actual-description text">${hi(selected.description)}</p>`:''}${renderStepConversationSummary(payload,selected,conversationRefs)}${stepTestFiles(payload,c.id,g.id,selected.observationId,selected.actionId)}${readback?`<div class="step-readback ${selected.focus&&row.status==='violation'?'problem':''}"><strong>${selected.focus&&row.status==='violation'?u('问题现场记录'):u('实际结果记录')}</strong><span>${hi(readback)}</span></div>`:''}${selected.note?`<p class="step-warning">${hi(selected.note)}</p>`:''}${selected.sharedEvidenceIds.length?uiMarkup('<p class="step-warning">原记录将部分材料共同关联到多个步骤；共享引用不等于逐步独立截图。</p>'):''}${selected.arranged?uiMarkup('<p class="reader-note-origin">步骤标题与证据位置依据既有记录整理；原操作文本及业务结论未改。</p>'):''}`:`<div class="reader-empty"><strong>${row.status==='not_tested'?u('本目标未完成实际检查'):u('未留存逐步动作')}</strong>${row.status==='not_tested'?u('以下材料仅对应已登记准备或缺口，不表示该目标已验证。'):u('只展示目标关联材料，不将其分配给虚构步骤。')}</div>`}${ids.length?uiHtml`<div class="proof-tabs" role="tablist" aria-label="本步证据">${ids.map((id,i)=>`<button data-proof-id="${esc(id)}" role="tab" aria-selected="${state.proofId===id}">${esc(kindLabels[evidenceMap.get(id)?.kind??'other'])} ${i+1}</button>`).join('')}</div><div class="proof-stage" data-proof-step="${esc(selected?.key??'')}">${evidenceCard(state.proofId)}</div>`:uiMarkup('<div class="reader-empty"><strong>此步没有独立关联的截图或响应文件</strong>保留原记录的资料缺口，不使用其他时刻的图片冒充这一步现场。</div>')}${selected?uiHtml`<p class="step-meta">操作发生时间：${time(selected.occurredAt)} · ${esc(selected.actionId)}</p>`:''}${view.unassignedEvidenceIds.length&&selected?uiHtml`<details class="step-unassigned"><summary>目标级其他证据 · ${view.unassignedEvidenceIds.length} 项（未分配到当前步骤）</summary><p class="hint">材料仍保留，不自动当作该步证据。</p>${evidenceButtons(view.unassignedEvidenceIds,u('目标级引用'))}</details>`:''}${!selected&&row.observations.length?uiHtml`<details class="step-goal-observations"><summary>查看已登记的目标观察</summary>${row.observations.map(o=>`<p class="text">${hi(o.actual??o.summary)}</p>`).join('')}</details>`:''}`;
   }
   function goalCard(row:Row):string{
     const key=row.c.id+'/'+row.g.id,active=state.goalId===row.g.id&&state.selectedCase===row.c.id,matched=filtered().includes(row);
     return `<details class="panel goal-card ${active?'active-goal':''} ${matched?'':'not-matched-goal'}" id="goal-${esc(row.c.id)}-${esc(row.g.id)}" data-goal-card="${esc(key)}" data-owner-case="${esc(row.c.id)}" data-owner-goal="${esc(row.g.id)}" ${goalOpen.has(key)?'open':''}><summary><span class="goal-card-heading"><span class="inline-id">${esc(key)}</span><strong>${hi(row.g.title)}</strong>${badge(row.status)}</span>${row.a?`<span class="goal-preview">${hi(row.a.summary??row.a.rationale)}</span>`:uiMarkup('<span class="goal-preview">未登记评估，不能推断业务状态。</span>')}${!matched?uiMarkup('<span class="meta">未命中目录筛选，仍保留在场景正文。</span>'):''}</summary><div class="goal-content">${goalContent(row)}</div></details>`;
   }
   function metadata(e:Evidence):string{const p=payload.previews[e.id],m=e.metadata;return uiHtml`<details><summary>来源与文件完整性</summary><div class="meta text">证据 ${esc(e.id)}\n来源：${esc(e.source)}\n登记时间：${time(e.collectedAt)}\n来源采集时间：${time(e.capturedAt)}\nSHA-256：${esc(e.sha256)}\n留存字节：${e.bytes}${p?.width?uiTemplate`\n实际图片尺寸：${p.width} × ${p.height}`:''}${m?.page?u('\n页面：')+esc(m.page):''}${m?.object?u('\n对象：')+esc(m.object):''}${m?.scope?u('\n采集范围：')+esc({page:u('页面'),viewport:u('视口'),element:u('局部元素'),document:u('文档'),unknown:u('未知')}[m.scope]):''}${m?.redaction?u('\n脱敏：')+esc(m.redaction):''}${m?.omissionReason?u('\n省略：')+esc(m.omissionReason):''}</div><p class="hint">hash一致只证明留存字节一致，不证明事实真实或业务正确。</p></details>`;}
-  function imageSource(e:Evidence):string|undefined{const p=payload.previews[e.id],a=p?.assetId?payload.assets[p.assetId]:undefined;return a?.kind==='image'&&a.data&&/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(a.data)?a.data:undefined;}
+  const imageSources=new Map<string,string|undefined>();
+  const imageUrls=new Set<string>();
+  const imageAvailability=new Map<string,boolean>();
+  function imageAvailable(e:Evidence):boolean {
+    const id=payload.previews[e.id]?.assetId,a=id?payload.assets[id]:undefined;
+    if(!id||a?.kind!=='image')return false;
+    let available=imageAvailability.get(id);
+    if(available===undefined){available=payload.delivery.mode==='bundle'?!!attachmentHref(a.attachmentPath):!!a.data&&/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(a.data);imageAvailability.set(id,available);}
+    return available;
+  }
+  function imageSource(e:Evidence):string|undefined {
+    const p=payload.previews[e.id],id=p?.assetId,a=id?payload.assets[id]:undefined;
+    if(!id||a?.kind!=='image'||!imageAvailable(e))return undefined;
+    if(imageSources.has(id))return imageSources.get(id);
+    let src:string|undefined;
+    if(payload.delivery.mode==='bundle')src=attachmentHref(a.attachmentPath);
+    else if(a.data){
+      try {
+        const raw=atob(a.data.slice(a.data.indexOf(',')+1)),bytes=Uint8Array.from(raw,c=>c.charCodeAt(0));
+        src=URL.createObjectURL(new Blob([bytes],{type:a.mediaType}));imageUrls.add(src);
+      } catch { imageAvailability.set(id,false); }
+    }
+    imageSources.set(id,src);return src;
+  }
+  window.addEventListener('pagehide',event=>{if(!event.persisted){for(const url of imageUrls)URL.revokeObjectURL(url);imageUrls.clear();}});
   function evidenceButtons(ids:string[],context=u('关联证据')):string{return unique(ids).map(id=>`<button class="link-button" data-evidence="${esc(id)}" data-evidence-context="${esc(context)}">${esc(evidenceMap.get(id)?.description??id)}</button>`).join('');}
   function textEvidence(e:Evidence,text:string,expanded:boolean,p:Payload['previews'][string]|undefined):string{
     let preview:ReturnType<typeof reportViewModel.requestPreview>=null;
@@ -262,14 +341,14 @@ Object.assign(globalThis,{reportViewModel,conversationViewModel:{stepConversatio
   function evidenceGrid(ids:string[],context=u('当前引用')):string{const all=unique(ids),images=all.filter(id=>evidenceMap.get(id)?.kind==='screenshot'),documents=all.filter(id=>!images.includes(id));return all.length?`${images.length?`<div class="evidence-images">${images.map(id=>evidenceCard(id,context)).join('')}</div>`:''}${documents.length?`<div class="evidence-documents">${documents.map(id=>evidenceCard(id,context)).join('')}</div>`:''}`:uiMarkup('<p class="empty">没有关联证据；这不是通过结论。</p>');}
   function evidenceForGoal(row:Row,note:GoalNote|undefined):string{
     const primary=note?.primaryEvidenceIds.length?note.primaryEvidenceIds:row.evidenceIds.filter(id=>evidenceMap.get(id)?.kind==='screenshot').slice(0,1),remaining=row.evidenceIds.filter(id=>!primary.includes(id));
-    return uiHtml`<section class="goal-evidence"><h3>留存证据 <span class="meta">原目标引用 ${row.evidenceIds.length} 项</span></h3>${primary.length?`<p class="hint">${note?.primaryEvidenceIds.length?u('以下查看重点由AI依据既有材料事后整理，未补拍或更改原图。'):u('先展示首张引用截图；原登记未指定关键截图，引用顺序不代表证据充分性。')}</p>${primary.map(id=>{const use=note?.evidenceUses.find(u=>u.evidenceId===id);return `${evidenceCard(id,row.evidenceIds.includes(id)?u('当前引用'):u('事后复核引用'))}${use?uiHtml`<div class="evidence-purpose"><strong>事后证据说明：${hi(use.purpose)}</strong><p class="text">支持事实：${hi(use.fact)}</p>${use.limitations.length?uiHtml`<p class="hint">局限：${hi(use.limitations.join('；'))}</p>`:''}</div>`:''}`;}).join('')}`:''}${remaining.length?uiHtml`<details class="other-evidence"><summary>其他引用证据 · ${remaining.length} 项（截图、DOM、接口或资料）</summary>${evidenceGrid(remaining)}</details>`:row.evidenceIds.length?'':uiMarkup('<p class="empty">当前目标没有关联证据；不据此自动推断业务状态。</p>')}</section>`;
+    return uiHtml`<section class="goal-evidence"><h3>留存证据 <span class="meta">原目标引用 ${row.evidenceIds.length} 项</span></h3>${primary.length?`<p class="hint">${note?.primaryEvidenceIds.length?u('以下查看重点由AI依据既有材料事后整理，未补拍或更改原图。'):u('先展示首张引用截图；原登记未指定关键截图，引用顺序不代表证据充分性。')}</p>${primary.map(id=>{const use=note?.evidenceUses.find(u=>u.evidenceId===id);return `${evidenceCard(id,row.evidenceIds.includes(id)?u('当前引用'):u('事后复核引用'))}${use?uiHtml`<div class="evidence-purpose"><strong>事后证据说明：${hi(use.purpose)}</strong><p class="text">支持事实：${hi(use.fact)}</p>${use.limitations.length?uiHtml`<p class="hint">局限：${hi(use.limitations.join('；'))}</p>`:''}</div>`:''}`;}).join('')}`:''}${remaining.length?lazyDetails(uiTemplate`其他引用证据 · ${remaining.length} 项（截图、DOM、接口或资料）`,()=>evidenceGrid(remaining),'class="other-evidence"'):row.evidenceIds.length?'':uiMarkup('<p class="empty">当前目标没有关联证据；不据此自动推断业务状态。</p>')}</section>`;
   }
   function readingNote(note:GoalNote):string{return uiHtml`<section class="retrospective-note"><h3>事后复核说明 <span class="meta">未重新执行</span></h3><p class="text">${hi(note.summary)}</p>${note.preparation.length?uiHtml`<h4>建议复核前提</h4>${list(note.preparation)}`:''}${note.reviewSteps.length?uiHtml`<h4>建议复核路线（不是原实际操作记录）</h4><ol>${note.reviewSteps.map(s=>`<li class="text">${hi(s)}</li>`).join('')}</ol>`:''}<p class="note">${hi(note.limitations.join('；'))}</p><details><summary>复核说明来源与其他证据用途</summary><p class="meta">${esc(note.sourceLabels.join('、'))}</p>${note.evidenceUses.map(use=>`<p><strong>${hi(use.purpose)}</strong>：${hi(use.fact)}${use.limitations.length?u('；局限：')+hi(use.limitations.join('；')):''}${evidenceButtons([use.evidenceId],u('事后复核引用'))}</p>`).join('')}</details></section>`;}
   function contextFact(title:string,f:ContextFact):string{const value=f.state==='known'?f.summary:(f.state==='unknown'?u('未知：'):u('不适用：'))+(f.summary);return `<div class="contextfact"><div class="kicker">${title}</div><p class="text">${hi(value)}</p>${f.sources.flatMap(s=>s.evidenceIds).length?evidenceButtons(f.sources.flatMap(s=>s.evidenceIds),u('上下文来源')):uiMarkup('<p class="meta">未关联独立来源证据。</p>')}</div>`;}
   function renderContext(c:Context):string{return uiHtml`<section class="fact"><h4>执行上下文 <span class="inline-id">${esc(c.id)}</span></h4><div class="contexts">${contextFact(u('环境 / 版本'),c.environment)}${contextFact(u('身份 / 角色 / 租户'),c.identity)}${contextFact(u('操作对象'),c.objects)}${contextFact(u('初始状态'),c.initialState)}${contextFact(u('授权条件'),c.authorization)}</div>${c.notes?`<p class="hint text">${esc(c.notes)}</p>`:''}</section>`;}
   function renderObservation(o:Observation,c:CaseData,context=u('当前引用')):string{
     const ctx=c.contexts.find(ctx=>ctx.id===o.contextId);
-    return uiHtml`<section class="fact"><h4>实际观察 <span class="inline-id">${esc(o.id)}</span></h4><p class="text">${hi(o.actual??o.summary)}</p><p class="meta">事实发生时间：${time(o.occurredAt)}${o.contextId?u(' · 上下文 ')+esc(o.contextId):u(' · 未绑定独立上下文')}</p>${ctx?uiHtml`<details><summary>身份、对象与初态</summary>${renderContext(ctx)}</details>`:''}${o.actions?.length?o.actions.map((a,i)=>uiHtml`<div class="action"><div class="action-header"><span class="action-number">${i+1}</span><div><h4>${hi(a.description)}</h4>${a.input?uiHtml`<p class="text"><strong>实际输入：</strong>${hi(a.input)}</p>`:''}${a.result?uiHtml`<p class="text"><strong>观察结果：</strong>${hi(a.result)}</p>`:''}<p class="meta">操作时间：${time(a.occurredAt)} · ${esc(a.id)}</p></div></div>${evidenceGrid(a.evidenceIds,context)}${(o.evidenceLinks??[]).filter(l=>l.actionId===a.id).map(l=>uiHtml`<p><strong>证据用途：</strong>${esc(l.purpose)}；支持事实：${esc(l.fact)}${l.limitations.length?u('；局限：')+esc(l.limitations.join('；')):''}${evidenceButtons([l.evidenceId],context)}</p>`).join('')}</div>`).join(''):uiMarkup('<p class="note">原记录未提供独立的实际动作序列。下方计划不能当作已执行步骤。</p>')}${(o.evidenceLinks??[]).filter(l=>!l.actionId).map(l=>`<p><strong>${esc(l.purpose)}</strong>：${esc(l.fact)}${l.limitations.length?u('；局限：')+esc(l.limitations.join('；')):''}${evidenceButtons([l.evidenceId],context)}</p>`).join('')}<details><summary>原始观察与必要语义引用</summary><p class="text">${esc(o.summary)}</p><p class="meta">覆盖：${esc(o.coveredRefs.join('、')||u('未声明'))}</p>${evidenceButtons(o.evidenceIds,context)}</details></section>`;
+    return uiHtml`<section class="fact"><h4>实际观察 <span class="inline-id">${esc(o.id)}</span></h4><p class="text">${hi(o.actual??o.summary)}</p><p class="meta">事实发生时间：${time(o.occurredAt)}${o.contextId?u(' · 上下文 ')+esc(o.contextId):u(' · 未绑定独立上下文')}</p>${ctx?uiHtml`<details><summary>身份、对象与初态</summary>${renderContext(ctx)}</details>`:''}${o.actions?.length?o.actions.map((a,i)=>uiHtml`<div class="action"><div class="action-header"><span class="action-number">${i+1}</span><div><h4>${hi(a.description)}</h4>${a.input?uiHtml`<p class="text"><strong>实际输入：</strong>${hi(a.input)}</p>`:''}${a.result?uiHtml`<p class="text"><strong>观察结果：</strong>${hi(a.result)}</p>`:''}<p class="meta">操作时间：${time(a.occurredAt)} · ${esc(a.id)}</p></div></div>${evidenceButtons(a.evidenceIds,context)}${(o.evidenceLinks??[]).filter(l=>l.actionId===a.id).map(l=>uiHtml`<p><strong>证据用途：</strong>${esc(l.purpose)}；支持事实：${esc(l.fact)}${l.limitations.length?u('；局限：')+esc(l.limitations.join('；')):''}${evidenceButtons([l.evidenceId],context)}</p>`).join('')}</div>`).join(''):uiMarkup('<p class="note">原记录未提供独立的实际动作序列。下方计划不能当作已执行步骤。</p>')}${(o.evidenceLinks??[]).filter(l=>!l.actionId).map(l=>`<p><strong>${esc(l.purpose)}</strong>：${esc(l.fact)}${l.limitations.length?u('；局限：')+esc(l.limitations.join('；')):''}${evidenceButtons([l.evidenceId],context)}</p>`).join('')}<details><summary>原始观察与必要语义引用</summary><p class="text">${esc(o.summary)}</p><p class="meta">覆盖：${esc(o.coveredRefs.join('、')||u('未声明'))}</p>${evidenceButtons(o.evidenceIds,context)}</details></section>`;
   }
   function sameRun(id:string):boolean{return id==='self'||id===report.runId;}
   function relations(row:Row):string{
@@ -281,7 +360,7 @@ Object.assign(globalThis,{reportViewModel,conversationViewModel:{stepConversatio
   function referenceLabel(e:Evidence):string{const refs=referenceCache.get(e.caseId);return !refs?u('未关联场景'):refs.current.has(e.id)?u('当前引用'):refs.findings.has(e.id)?u('关联现象引用'):refs.history.has(e.id)?u('仅历史引用'):u('已登记未引用');}
   function historyFacts(view:ReturnType<typeof reportViewModel.history>,c:CaseData):string{
     const a=view.assessment;if(!a)return uiMarkup('<p class="empty">未找到当时的目标评估。</p>');
-    return uiHtml`<details><summary>当时完整事实、上下文与判断字段</summary><p class="hint">以下来自该次评估及其引用的不可变观察；复用早先观察不会被改写为新采集。</p>${view.contexts.map(renderContext).join('')}${view.observations.map(o=>renderObservation(o,c,u('历史引用'))).join('')}${(a.phenomena??[]).map(p=>`<section class="fact"><h4>${hi(p.title)}</h4><p class="text">${hi(p.actual)}</p>${p.limitations.length?list(p.limitations):''}${evidenceButtons(p.evidenceIds,u('历史现象引用'))}</section>`).join('')}${(a.gapDetails??[]).map(g=>uiHtml`<p class="note">${hi(g.missing)}；影响：${hi(g.impact)}${g.nextStep?u('；需要准备：')+hi(g.nextStep):''}</p>`).join('')}${a.diagnosis?uiHtml`<section class="fact"><h4>当时根因判断</h4><p>${esc(a.diagnosis.state)} / ${esc(a.diagnosis.category)}：${hi(a.diagnosis.summary)}</p>${evidenceButtons(a.diagnosis.evidenceIds,u('历史诊断引用'))}</section>`:''}${a.reproduction?uiHtml`<section class="fact"><h4>当时复核准备</h4>${list(a.reproduction.preparation)}<p>对象现状：${hi(a.reproduction.objectState)}</p><p>重复观察：${hi(a.reproduction.repeatability)}</p>${list(a.reproduction.limitations)}</section>`:''}<details><summary>完整历史原始字段（目标范围）</summary><pre class="body-text">${esc(JSON.stringify(view,null,2))}</pre></details></details>`;
+    return lazyDetails(u('当时完整事实、上下文与判断字段'),()=>uiHtml`<p class="hint">以下来自该次评估及其引用的不可变观察；复用早先观察不会被改写为新采集。</p>${view.contexts.map(renderContext).join('')}${view.observations.map(o=>renderObservation(o,c,u('历史引用'))).join('')}${(a.phenomena??[]).map(p=>`<section class="fact"><h4>${hi(p.title)}</h4><p class="text">${hi(p.actual)}</p>${p.limitations.length?list(p.limitations):''}${evidenceButtons(p.evidenceIds,u('历史现象引用'))}</section>`).join('')}${(a.gapDetails??[]).map(g=>uiHtml`<p class="note">${hi(g.missing)}；影响：${hi(g.impact)}${g.nextStep?u('；需要准备：')+hi(g.nextStep):''}</p>`).join('')}${a.diagnosis?uiHtml`<section class="fact"><h4>当时根因判断</h4><p>${esc(a.diagnosis.state)} / ${esc(a.diagnosis.category)}：${hi(a.diagnosis.summary)}</p>${evidenceButtons(a.diagnosis.evidenceIds,u('历史诊断引用'))}</section>`:''}${a.reproduction?uiHtml`<section class="fact"><h4>当时复核准备</h4>${list(a.reproduction.preparation)}<p>对象现状：${hi(a.reproduction.objectState)}</p><p>重复观察：${hi(a.reproduction.repeatability)}</p>${list(a.reproduction.limitations)}</section>`:''}<details><summary>完整历史原始字段（目标范围）</summary><pre class="body-text">${esc(JSON.stringify(view,null,2))}</pre></details>`,'');
   }
   function goalContent(row:Row):string{
     const {c,g,a,observations,contexts,actionEvents}=row,note=goalNote(c.id,g.id);
@@ -322,11 +401,12 @@ Object.assign(globalThis,{reportViewModel,conversationViewModel:{stepConversatio
   }
   function lifecycle():string{return state.view!=='scene'?'':report.cases.filter(c=>c.actionEvents.length&&c.id===state.selectedCase).map(c=>uiHtml`<details class="panel"><summary>${esc(c.title)}：原始动作尝试与核对记录</summary><p>意图、派发回执不代表业务通过；首次异常与处置均保留。</p>${c.actionEvents.map(e=>`<section class="fact"><h4>${esc(e.summary)}</h4><p class="meta">${esc(e.actionId+' / '+e.kind+' / '+e.purpose)}</p><p>${esc(e.dispatchState??e.resultState??e.disposition?.state??u('未声明'))}</p>${evidenceButtons(e.evidenceIds,u('动作事件证据'))}</section>`).join('')}</details>`).join('');}
   function render():void{
+    lazySections.clear();
     const oldStep=state.stepKey,oldGoal=document.querySelector<HTMLElement>('.goal-workbench')?.id,proofY=document.querySelector('.step-proof-panel')?.scrollTop??0,stepY=document.querySelector('.actual-step-list')?.scrollTop??0;
     if(state.view==='scene'&&!rows.some(r=>r.c.id===state.selectedCase&&r.g.id===state.goalId)){const rs=rows.filter(r=>r.c.id===state.selectedCase);state.goalId=(rs.find(r=>r.status==='violation')??rs[0])?.g.id??'';}
     renderNavigation();const c=report.cases.find(c=>c.id===state.selectedCase);$('#breadcrumbs').innerHTML=state.view==='overview'?uiMarkup('<strong>总览</strong>'):uiHtml`<button data-overview>总览</button><span aria-hidden="true">›</span><strong>${state.view==='evidence'?u('证据库'):state.view==='files'?u('测试附件'):esc((c?.id??'')+' '+(c?.title??''))}</strong>`;
     $('#detail').innerHTML=state.view==='overview'?sceneOverview()+findingMatches():state.view==='scene'?sceneDetail():state.view==='files'?testFileIndex(payload,fileQuery,fileCase,fileGoal,fileDirection):library();$('#detail').insertAdjacentHTML('beforeend',lifecycle());
-    const indexes=new Map<string,number>();document.querySelectorAll<HTMLDetailsElement>('#detail details:not(.goal-card)').forEach(d=>{const el=d.closest<HTMLElement>('[data-owner-case][data-owner-goal]'),owner=el?el.dataset.ownerCase+'/'+el.dataset.ownerGoal+(d.closest('.proof-stage')?'/'+state.stepKey+'/'+state.proofId:d.closest('.step-test-files')?'/'+state.stepKey+'/files':'/records'):state.view+'/'+state.selectedCase,index=indexes.get(owner)??0;indexes.set(owner,index+1);const key=owner+'/reading/'+index;d.dataset.readingKey=key;d.open=readingOpen.has(key);});
+    bindReading($('#detail'));
     if(oldGoal===document.querySelector('.goal-workbench')?.id&&oldStep===state.stepKey){document.querySelector('.step-proof-panel')?.scrollTo(0,proofY);document.querySelector('.actual-step-list')?.scrollTo(0,stepY);}
   }
   $('#project-line').textContent=report.project;$('#run-line').textContent=uiTemplate`运行 ${report.runId} · 时间显示 UTC+08:00 · 离线报告 v9`;
@@ -354,7 +434,7 @@ Object.assign(globalThis,{reportViewModel,conversationViewModel:{stepConversatio
     document.body.style.overflow='hidden';document.documentElement.style.overflow='hidden';d.showModal();
   }
   document.querySelectorAll<HTMLDialogElement>('dialog').forEach(d=>d.addEventListener('close',()=>{
-    const m=modals.get(d.id);if(!m)return;modals.delete(d.id);document.body.style.overflow=m.body;document.documentElement.style.overflow=m.root;window.scrollTo(m.x,m.y);m.focus?.focus({preventScroll:true});if(!applyingLocation&&d.id!=='theme-dialog'){const saved:unknown=history.state;if(object(saved)&&saved.scope===readerScope&&saved.modalEntry===true){history.back();return;}if($<HTMLDialogElement>('#lightbox').open)saveHash(gallery[imageIndex]);else if($<HTMLDialogElement>('#evidence-dialog').open)saveHash($('#evidence-dialog').dataset.evidenceId);else saveHash();}
+    const m=modals.get(d.id);if(!m)return;if(d.id==='lightbox')$<HTMLImageElement>('#lightbox-image').removeAttribute('src');modals.delete(d.id);document.body.style.overflow=m.body;document.documentElement.style.overflow=m.root;window.scrollTo(m.x,m.y);m.focus?.focus({preventScroll:true});if(!applyingLocation&&d.id!=='theme-dialog'){const saved:unknown=history.state;if(object(saved)&&saved.scope===readerScope&&saved.modalEntry===true){history.back();return;}if($<HTMLDialogElement>('#lightbox').open)saveHash(gallery[imageIndex]);else if($<HTMLDialogElement>('#evidence-dialog').open)saveHash($('#evidence-dialog').dataset.evidenceId);else saveHash();}
   }));
   let gallery:string[]=[],imageIndex=0,imageContext='',zoom=1;
   function setImageMode(mode:'fit'|'original'|'zoom'):void{
@@ -377,8 +457,8 @@ Object.assign(globalThis,{reportViewModel,conversationViewModel:{stepConversatio
   }
   function openImage(id:string,context:string,trigger:HTMLElement):void{
     const row=evidenceOwner(trigger);
-    const step=row&&trigger.closest('.proof-stage')?reportViewModel.steps(row.c,row.g.id,report.evidenceCatalog.items,readerNote(row.c.id,row.g.id)).items.find(s=>s.key===state.stepKey):undefined;
-    gallery=(step?step.evidenceIds:context===u('当前引用')&&row?row.evidenceIds:[id]).filter(id=>{const e=evidenceMap.get(id);return !!e&&!!imageSource(e);});
+    const step=row&&trigger.closest('.proof-stage')?stepsFor(row).items.find(s=>s.key===state.stepKey):undefined;
+    gallery=(step?step.evidenceIds:context===u('当前引用')&&row?row.evidenceIds:[id]).filter(id=>{const e=evidenceMap.get(id);return !!e&&imageAvailable(e);});
     if(!applyingLocation)saveHash();if(!gallery.includes(id))gallery=[id];imageIndex=gallery.indexOf(id);imageContext=context;showImage();openDialog('lightbox',trigger);saveHash(id,!applyingLocation);
   }
   function openEvidence(id:string,context:string,trigger:HTMLElement):void{
@@ -409,7 +489,7 @@ Object.assign(globalThis,{reportViewModel,conversationViewModel:{stepConversatio
   $('#search').addEventListener('input',()=>{window.clearTimeout(searchTimer);searchTimer=window.setTimeout(()=>{state.query=$<HTMLInputElement>('#search').value.trim();linkedNotice='';render();saveHash();},120);});
   $<HTMLSelectElement>('#status-filter').onchange=()=>{window.clearTimeout(searchTimer);state.query=$<HTMLInputElement>('#search').value.trim();state.status=$<HTMLSelectElement>('#status-filter').value as State['status'];linkedNotice='';render();saveHash();};
   document.addEventListener('change',event=>{const t=event.target;if(!(t instanceof HTMLSelectElement))return;if(t.id==='evidence-kind'){state.evidenceKind=t.value;$('#detail').innerHTML=library();}if(t.id==='evidence-use'){state.evidenceUse=t.value;$('#detail').innerHTML=library();}});
-  document.addEventListener('toggle',event=>{const d=event.target;if(!(d instanceof HTMLDetailsElement)||!d.isConnected)return;if(d.classList.contains('scene')&&d.dataset.case){if(d.open)sceneOpen.add(d.dataset.case);else sceneOpen.delete(d.dataset.case);const b=d.querySelector<HTMLButtonElement>('.scene-toggle');if(b){b.textContent=d.open?'▾':'▸';b.setAttribute('aria-expanded',String(d.open));b.setAttribute('aria-label',(d.open?u('收起'):u('展开'))+d.dataset.case);}}if(d.classList.contains('goal-card')&&d.dataset.goalCard){if(d.open)goalOpen.add(d.dataset.goalCard);else goalOpen.delete(d.dataset.goalCard);}if(d.dataset.readingKey){if(d.open)readingOpen.add(d.dataset.readingKey);else readingOpen.delete(d.dataset.readingKey);}},true);
+  document.addEventListener('toggle',event=>{const d=event.target;if(!(d instanceof HTMLDetailsElement)||!d.isConnected)return;if(d.open)materialize(d);if(d.classList.contains('scene')&&d.dataset.case){if(d.open)sceneOpen.add(d.dataset.case);else sceneOpen.delete(d.dataset.case);const b=d.querySelector<HTMLButtonElement>('.scene-toggle');if(b){b.textContent=d.open?'▾':'▸';b.setAttribute('aria-expanded',String(d.open));b.setAttribute('aria-label',(d.open?u('收起'):u('展开'))+d.dataset.case);}}if(d.classList.contains('goal-card')&&d.dataset.goalCard){if(d.open)goalOpen.add(d.dataset.goalCard);else goalOpen.delete(d.dataset.goalCard);}if(d.dataset.readingKey){if(d.open)readingOpen.add(d.dataset.readingKey);else readingOpen.delete(d.dataset.readingKey);}},true);
   document.addEventListener('click',event=>{
     const t=event.target;if(!(t instanceof Element))return;
     const disclosure=t.closest('summary')?.parentElement;
@@ -422,9 +502,9 @@ Object.assign(globalThis,{reportViewModel,conversationViewModel:{stepConversatio
     if(target.dataset.conversation){event.preventDefault();conversationReader.open(target.dataset.conversation,(target.dataset.conversationMessages??'').split(',').filter(Boolean));return;}
     if(target.dataset.close){$<HTMLDialogElement>('#'+target.dataset.close).close();return;}
     if(target.dataset.themeId){applyTheme(target.dataset.themeId,true);$<HTMLDialogElement>('#theme-dialog').close();return;}
-    if(target.dataset.stepKey){saveHash();state.stepKey=target.dataset.stepKey;state.proofId='';render();document.querySelector('.step-proof-panel')?.scrollTo(0,0);saveHash(undefined,true);return;}
-    if(target.dataset.proofId){state.proofId=target.dataset.proofId;const y=document.querySelector('.actual-step-list')?.scrollTop??0;render();document.querySelector('.actual-step-list')?.scrollTo(0,y);saveHash();return;}
-    if(target.dataset.section){event.preventDefault();document.getElementById(target.dataset.section)?.scrollIntoView({block:'start'});return;}
+    if(target.dataset.stepKey){const row=currentRow();if(!row||!stepsFor(row).items.some(s=>s.key===target.dataset.stepKey)||state.stepKey===target.dataset.stepKey)return;saveHash();state.stepKey=target.dataset.stepKey;state.proofId='';updateStep(row);saveHash(undefined,true);return;}
+    if(target.dataset.proofId){const row=currentRow();if(row)updateProof(row,target.dataset.proofId);saveHash();return;}
+    if(target.dataset.section){event.preventDefault();const section=document.getElementById(target.dataset.section);if(section instanceof HTMLDetailsElement){section.open=true;materialize(section);}section?.scrollIntoView({block:'start'});return;}
     if(target.dataset.toggleScene){event.preventDefault();const d=target.closest<HTMLDetailsElement>('details.scene');if(d){d.open=!d.open;if(d.open)sceneOpen.add(target.dataset.toggleScene);else sceneOpen.delete(target.dataset.toggleScene);}return;}
     if(target.hasAttribute('data-overview')){navigate({view:'overview',selectedCase:'',goalId:''});return;}
     if(target.dataset.scene){event.preventDefault();openScene(target.dataset.scene);return;}

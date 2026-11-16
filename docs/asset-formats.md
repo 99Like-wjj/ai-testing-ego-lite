@@ -1,6 +1,6 @@
-# 数据契约（v9 / 0.2.1）
+# 数据契约（v9 / 0.2.2）
 
-0.2.1 正式版本，Skill/包名ai-testing-ego-lite，存储仍v9。progress/context使用contextReadVersion 1；CLI record以recordResponseVersion 1封装原收据及结构反馈；显式usage汇总独立于业务结果。设计与开发自测保留在源码仓库，不进入运行包。
+0.2.2 为正式版本。Skill/包名ai-testing-ego-lite，存储仍v9。progress/context使用contextReadVersion 1；CLI record以recordResponseVersion 1封装原收据及结构反馈；显式usage汇总独立于业务结果。设计与开发自测保留在源码仓库，不进入运行包。
 
 
 当前开发版主契约 v9、regressionVersion 2、networkVersion 1。源码 Schema 是外部结构定义，运行时同时验证引用、内容指纹与事务语义；类型从 Schema 生成，不直接改生成文件。工程通过不是业务验收。
@@ -48,6 +48,8 @@ Report/HTML payload 使用 v9。报告仅统计本轮选中点，另列源清单
 HTML、Markdown、JSON 同源。delivery=auto 需要下载原件或历史附件时使用 bundle；其他为 inline。附件按实际引用收集，交付清单保存路径、字节、指纹与历史摘要指纹。完整 bundle 可使用已保管历史附件校验，无需旧目录仍在原位置；摘要不能代替缺失原件。
 
 ## 格式影响
+
+0.2.2 不改变主存储 v9 或交付清单 v2。HTML 的图片 ReportAsset 在 inline 中保留 data，在 bundle 中使用可选 attachmentPath（与已核验原件相同的受限相对路径），不再在 HTML 中携带普通截图 Base64。浏览器通过 img 加载本地原件，不通过 fetch；CSP 仅允许自身图片、data 和 Blob，继续禁止 connect/object/base/form。测试附件的有界 testFileDownloads 下载副本继续保留。旧 HTML 不自动改写，精确校验旧交付应使用原工具修订；新报告须另存到新目录。
 
 0.1.8-rc.2 在主v9中增加可选字段：Observation.phase记录预期/实际阶段及依据；Assessment.display记录可读标题、实际现象、影响和维度；ActionFact.inputSummary/replySummary/inputPresentation/conversations记录真实步骤输入、回复及消息引用。旧字段和业务四态不变，未填写的新信息显示缺口，不从计划推断。
 

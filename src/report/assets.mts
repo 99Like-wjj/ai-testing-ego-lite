@@ -94,7 +94,8 @@ export async function htmlReportPayload(root: string, report: Report, options: P
     if (item.kind === 'screenshot' || meta?.testFile && mime) {
       if (mime) {
         p.assetId = item.sha256; p.mediaType = mime; Object.assign(p, rasterDimensions(bytes));
-        assets[item.sha256] ??= { kind: 'image', mediaType: mime, bytes: bytes.length, retainedBytes: bytes.length, truncated: false, data: 'data:' + mime + ';base64,' + bytes.toString('base64') };
+        assets[item.sha256] ??= { kind: 'image', mediaType: mime, bytes: bytes.length, retainedBytes: bytes.length, truncated: false,
+          ...(mode === 'bundle' ? { attachmentPath: attachmentName(item.sha256, mime, meta?.testFile?.name) } : { data: 'data:' + mime + ';base64,' + bytes.toString('base64') }) };
         if (meta?.width && p.width && meta.width !== p.width || meta?.height && p.height && meta.height !== p.height) p.previewNote = u('来源声明尺寸与文件实际尺寸不一致；展示文件实际宽高。');
       } else { p.contentState = 'unsupported'; p.previewNote = u('已登记截图不是支持预览的 PNG、JPEG 或 WebP。原文件未被当作可执行内容打开。'); if (mode === 'inline') complete = false; }
     } else {
