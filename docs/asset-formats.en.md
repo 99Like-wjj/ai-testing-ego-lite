@@ -1,6 +1,6 @@
-# Contracts — v9 / 0.2.1
+# Contracts — v9 / 0.2.2-rc.1
 
-0.2.1 is the release version. The Skill/package is ai-testing-ego-lite; storage remains v9. Bounded progress/context outputs use contextReadVersion 1; CLI record wraps the unchanged receipt in recordResponseVersion 1. Explicit usage exports are independent of business results. Source design and development validation stay in the source repository, outside the runtime package.
+0.2.2-rc.1 is an unpublished development version. The Skill/package is ai-testing-ego-lite; storage remains v9. Bounded progress/context outputs use contextReadVersion 1; CLI record wraps the unchanged receipt in recordResponseVersion 1. Explicit usage exports are independent of business results. Source design and development validation stay in the source repository, outside the runtime package.
 
 
 Retained from 0.1.8: optional Observation.phase, Assessment.display and ActionFact inputSummary/replySummary/inputPresentation/conversations. Facts and four-state judgments remain separate. Missing data is not inferred from plans. conversationVersion 1 records provider-neutral messages, source references, fidelity, coverage and completion basis; see schemas/conversation.schema.json and examples/conversation.example.json. Local source IDs map to retained same-case originals through metadata.conversationSources; parallel imports remap external IDs without changing artifact bytes. Limits: 8MiB per artifact and 262144 UTF-16 code units per message. Explicitly scoped parts are authored by AI rather than silently truncated.
@@ -28,6 +28,8 @@ Reports use v9. First runs have no history panel. Historical observations and at
 Historical user data is preserved. There is no automatic migration, legacy reader or overwrite authority. Network contracts remain version 1.
 
 ## Report language and model provenance (report-language-model-1)
+
+In 0.2.2-rc.1, image ReportAsset keeps data in inline mode and uses an optional, whitelisted relative attachmentPath in bundle mode. Ordinary screenshots are no longer embedded in bundle HTML. Local img loads work without fetch; CSP allows same-origin images, data and Blob while connect/object/base/form remain blocked. Bounded testFileDownloads copies remain available. Storage v9 and deliveryVersion 2 remain unchanged. Existing HTML is never rewritten; use the original renderer for exact historical verification, or generate a new report directory.
 
 Optional v9 aiContext is accepted in cases, RecordPayload and report-context. Each uses entry records model, reasoningEffort, sourceKind, a SourceRef and scope. Unknown sources cannot assert model or effort. File sources are hash-checked; packet mapping and canonical transaction identity preserve authorship. Model metadata does not enter the necessary-goal definition hash, and unchanged definitions retain their original generator.
 

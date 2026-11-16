@@ -1,4 +1,4 @@
-import { uiText as u, uiMarkup, uiHtml, uiTemplate, formatUi } from '../report/ui-text.mjs';
+import { uiText as u, uiMarkup, uiHtml, uiTemplate, formatUi, readEmbeddedData } from '../report/ui-text.mjs';
 import type { Baseline, Case, CasesRef, Goal } from '../contracts/model.mjs';
 import { goalPlan } from '../contracts/case-view.mjs';
 import { feedbackFromText, makeReviewFeedback, parseReviewFeedback, type FeedbackDecision, type ReviewFeedback } from '../contracts/review-feedback.mjs';
@@ -9,7 +9,7 @@ import { saveReviewFile, type ReviewFile, type SaveHost } from './save-file.mjs'
 interface Model { kind: 'case_review'; schemaVersion: 9; cases: CasesRef; baseline: Baseline; expectedReviewNumber: number; initialFeedback: ReviewFeedback | null }
 interface Row { c: Case; g: Goal }
 const $ = <T extends HTMLElement = HTMLElement>(id: string): T => { const el = document.getElementById(id); if (!el) throw Error(u('缺少审阅控件：') + id); return el as T; };
-const model = JSON.parse($('case-data').textContent ?? 'null') as Model;
+const model = readEmbeddedData<Model>('case-data')!;
 if (model.kind !== 'case_review' || model.schemaVersion !== 9) throw Error(u('不支持的用例审阅页面。'));
 const rows: Row[] = model.baseline.cases.flatMap(c => c.goals.map(g => ({ c, g })));
 const points = new Map(rows.map(r => [r.g.pointId, r]));

@@ -1,6 +1,6 @@
-# 架构与职责（v9 / 0.2.1）
+# 架构与职责（v9 / 0.2.2-rc.1）
 
-0.2.1 正式版本，Skill/包名ai-testing-ego-lite，存储仍v9。progress/context使用contextReadVersion 1；CLI record以recordResponseVersion 1封装原收据及结构反馈；显式usage汇总独立于业务结果。见[当前设计](v0.2.1-design.md)和[发布验证](v0.2.1-release-validation.md)。
+0.2.2-rc.1 为未发布开发版；HTML 报告性能改动和验证见[0.2.2 方案](v0.2.2-report-performance.md)。Skill/包名ai-testing-ego-lite，存储仍v9。progress/context使用contextReadVersion 1；CLI record以recordResponseVersion 1封装原收据及结构反馈；显式usage汇总独立于业务结果。见[当前设计](v0.2.1-design.md)和[发布验证](v0.2.1-release-validation.md)。
 
 
 ![架构职责示意：AI、Ego 与本地工具的分工。](images/architecture.zh-CN.png)

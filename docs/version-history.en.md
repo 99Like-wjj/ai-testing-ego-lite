@@ -4,11 +4,30 @@
 
 The AI interprets goals and judges business outcomes, Ego operates the browser, and local tools retain evidence and deliver reports.
 
-![Newest first: 0.2.1 stable, followed by historical 0.1.9 through 0.1.2; capability illustration only.](images/version-history.png)
+![Newest first: unpublished 0.2.2, followed by historical 0.2.1 through 0.1.2; capability illustration only.](images/version-history.png)
+
+## v0.2.2 · HTML report performance (RC.1 / NOT RELEASED)
+
+Read document data once, render complete records on demand, update steps locally and load bundle images from original attachments. Storage stays v9; existing reports are not rewritten. No installation package, Tag or Release was created. See the [0.2.2 plan and validation](v0.2.2-report-performance.md).
 
 ## v0.2.1 · Efficiency, test attachments, review navigation and rename (Stable release)
 
 0.2.1 adds scoped reads, commit feedback, explicit usage summaries, test attachment downloads and review-navigation fixes. Repository, package and Skill use ai-testing-ego-lite. Stored contracts remain v9; deliveryVersion is 2. Get the full renamed package from [v0.2.1 Release](https://github.com/99Like-wjj/ai-testing-ego-lite/releases/tag/v0.2.1) and see [release validation](v0.2.1-release-validation.md). Publication does not update user installations or rewrite historical assets.
+
+### v0.2.1 capabilities and validation context (retained)
+
+
+- Combine already-determined local preparation and execution in one host invocation while preserving decisions that need new observations.
+- Read bounded summaries, goal indices and one point's complete required semantics; export long originals explicitly.
+- Separate CLI record receipts from revision-pinned structural feedback. Missing feedback does not reverse a successful commit.
+- Summarize explicit usage exports, deduplicate requests, retain unknown metrics and avoid counting cache/reasoning twice.
+- Preserve registered test-file originals, purposes and associations, with individual downloads and a static ZIP collection. Safe previews do not execute active content; missing and excluded files remain explicit.
+- Review navigation follows filters and restores reading positions on history navigation, with approved/continue-review states and feedback export. UI marks do not replace formal confirmation or execution authorization.
+- Unify the new Skill identity/build paths. Review, knowledge, complete conversations, evidence reports, regression and concurrency boundaries remain available.
+
+Stored contracts remain v9, knowledge v3 and regression v2; delivery manifests advance to deliveryVersion 2. New context/record CLI outputs have independent versions; see [formats](asset-formats.en.md) and [toolbox](../skills/ai-testing-ego-lite/references/local-toolbox.en.md). No automatic replacement of old packages or historical reports.
+
+Reports retain the user language and sourced model/reasoning effort for generation and execution; unknown stays unknown and original evidence stays unchanged.
 
 ## v0.1.9 · Project knowledge, testing experience and offline review export (Stable release)
 

@@ -1,6 +1,6 @@
 <p align="center"><img src="docs/images/hero.png" alt="ai-testing-ego-lite: AI autonomous Web testing with Ego Lite" width="100%"></p>
 
-> **Pre-release manual review snapshot:** This branch prepares 0.2.1. The user requested merging for review before publishing; no tag or Release has been created. Stable-release wording, download links and illustrations below preview the proposed publication, not a completed release.
+> **0.2.2 development branch, unpublished:** Current identity is `0.2.2-rc.1 / report-performance-1`. This iteration is source development and self-testing only; see the [plan and validation](docs/v0.2.2-report-performance.md).
 
 <h1 align="center">AI Testing with Ego Lite</h1>
 
@@ -30,29 +30,24 @@ As models improve, we aim to let AI use these capabilities more effectively. Act
 
 ## Current version
 
-The stable release is **[0.2.1](https://github.com/99Like-wjj/ai-testing-ego-lite/releases/tag/v0.2.1) / attachments-review-2**. The repository, installation package and Skill use `ai-testing-ego-lite`; invoke `$ai-testing-ego-lite`. The Chinese display name is “AI 自动化测试”. Verify the complete installation identity before use. See the [attachment and review validation](docs/evaluations/attachment-review-20261106/validation.md) for scope and results.
-
-Use the complete compiled package described in [installation guidance](INSTALL.zh-CN.md), not the source ZIP. Install the complete renamed Skill, verify it, then remove the old discovered entry without retaining an alias; historical data stays intact. See [0.2.1 design](docs/v0.2.1-design.md) and [development validation](docs/v0.2.1-development-validation.md).
+Current source identity is **0.2.2-rc.1 / report-performance-1**, an unpublished development version. Prior 0.2.1 materials remain in the [Release page](https://github.com/99Like-wjj/ai-testing-ego-lite/releases/tag/v0.2.1) and [full history](docs/version-history.en.md); no 0.2.2 installation package has been generated or delivered. The Skill remains `ai-testing-ego-lite`, invoked with `$ai-testing-ego-lite`. See the [installation guide](INSTALL.zh-CN.md).
 
 ## Version evolution
 
-![Stable 0.2.1 followed by the three historical releases 0.1.9, 0.1.8 and 0.1.7; illustration only.](docs/images/readme-version-history.png)
+![Unpublished 0.2.2 development followed by historical 0.2.1, 0.1.9 and 0.1.8; illustration only.](docs/images/readme-version-history.png)
 
 The README shows the latest version and three earlier versions. [Full version history](docs/version-history.en.md) retains older versions and validation records.
 
-## What changed in 0.2.1
+## What changed in 0.2.2
 
-- Combine already-determined local preparation and execution in one host invocation while preserving decisions that need new observations.
-- Read bounded summaries, goal indices and one point's complete required semantics; export long originals explicitly.
-- Separate CLI record receipts from revision-pinned structural feedback. Missing feedback does not reverse a successful commit.
-- Summarize explicit usage exports, deduplicate requests, retain unknown metrics and avoid counting cache/reasoning twice.
-- Preserve registered test-file originals, purposes and associations, with individual downloads and a static ZIP collection. Safe previews do not execute active content; missing and excluded files remain explicit.
-- Review navigation follows filters and restores reading positions on history navigation, with approved/continue-review states and feedback export. UI marks do not replace formal confirmation or execution authorization.
-- Unify the new Skill identity/build paths. Review, knowledge, complete conversations, evidence reports, regression and concurrency boundaries remain available.
+- Parse the embedded document once, including when presentation is omitted.
+- Render complete records and historical facts on first expansion; update steps and proof cards without replacing navigation or retained records.
+- Load ordinary bundle screenshots from local original attachments on demand; retain portable single HTML and reuse inline Blob image URLs.
+- Preserve goals, verdicts, evidence IDs, history and test-file downloads. Existing reports are never rewritten.
 
-Stored contracts remain v9, knowledge v3 and regression v2; delivery manifests advance to deliveryVersion 2. New context/record CLI outputs have independent versions; see [formats](docs/asset-formats.en.md) and [toolbox](skills/ai-testing-ego-lite/references/local-toolbox.en.md). No automatic replacement of old packages or historical reports.
+Storage remains v9, knowledge v3, regression v2 and deliveryVersion 2. See the [0.2.2 plan and validation](docs/v0.2.2-report-performance.md) for image asset changes and synthetic browser measurements. Separate thumbnails, search indexing and conversation batching await further measurement.
 
-Reports retain the user language and sourced model/reasoning effort for generation and execution; unknown stays unknown and original evidence stays unchanged.
+Reports retain the user language and sourced model/reasoning effort for generation and execution; unknown stays unknown and original evidence stays unchanged. See [language and model provenance](skills/ai-testing-ego-lite/references/report-language-model.md).
 
 ## Cases, evidence and delivery
 
@@ -111,7 +106,7 @@ Identities, URLs, paths and related identifiers are redacted. Original full-reso
 
 ## Quick start on Windows
 
-This source example targets 0.2.1 in .build/runtime without replacing the user installation. Follow the [installation and upgrade guide (Chinese)](INSTALL.zh-CN.md), verifying the version, revision and actual loaded directory.
+This source example targets development version 0.2.2-rc.1 in .build/runtime without replacing the user installation. Follow the [installation and upgrade guide (Chinese)](INSTALL.zh-CN.md), verifying the version, revision and actual loaded directory.
 
 Download the full installation package, SHA-256 checksums and release notes from [v0.2.1 Release](https://github.com/99Like-wjj/ai-testing-ego-lite/releases/tag/v0.2.1). GitHub-generated Source code archives are not full installation packages.
 
@@ -123,7 +118,7 @@ From the confirmed source root:
 npm ci
 npm run build
 $Tool = Join-Path (Get-Location).Path '.build/runtime/scripts/ego.mjs'
-node $Tool tool-info --expect-version 0.2.1 --expect-revision attachments-review-2
+node $Tool tool-info --expect-version 0.2.2-rc.1 --expect-revision report-performance-1
 $LocalRoot = Join-Path $env:LOCALAPPDATA 'EgoLiteTest'
 New-Item -ItemType Directory -Force -Path $LocalRoot | Out-Null
 $Project = Join-Path $LocalRoot ('project-' + [guid]::NewGuid().ToString('N'))

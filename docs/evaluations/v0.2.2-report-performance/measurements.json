@@ -1,0 +1,191 @@
+{
+  "synthetic": true,
+  "date": "2026-11-16",
+  "timezone": "Asia/Shanghai",
+  "baselineCommit": "5bccc9c8aa0402c7d03f986793050d6617bacc4b",
+  "developmentVersion": "0.2.2-rc.1",
+  "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+  "workload": {
+    "scenes": 1,
+    "goals": 1,
+    "actualSteps": 100,
+    "screenshots": 3,
+    "width": 1280,
+    "height": 720
+  },
+  "timingScope": "Synchronous JavaScript click handlers in a real Ego Chromium browser. Excludes subsequent layout, paint and image decoding. Timings are observations, not thresholds.",
+  "baseline": [
+    {
+      "name": "baseline-default",
+      "htmlBytes": 495971,
+      "openMs": 4915.100000008941,
+      "switchMs": [
+        4607.4000000059605,
+        5638.600000008941,
+        5396.5999999940395
+      ],
+      "parses": 78577,
+      "parseMs": 18361.099999070168,
+      "nodes": 9361,
+      "images": 604,
+      "closedRecordNodes": 8619,
+      "stable": false,
+      "htmlBytesIncludeInstrumentation": true
+    },
+    {
+      "name": "baseline-zh",
+      "htmlBytes": 496021,
+      "openMs": 338.29999999701977,
+      "switchMs": [
+        323,
+        329,
+        507.20000000298023
+      ],
+      "parses": 2,
+      "parseMs": 0.7999999970197678,
+      "nodes": 9361,
+      "images": 604,
+      "closedRecordNodes": 8619,
+      "stable": false,
+      "htmlBytesIncludeInstrumentation": true
+    }
+  ],
+  "optimized": [
+    {
+      "mode": "inline",
+      "language": "default",
+      "htmlBytes": 500740,
+      "openMs": 56.5,
+      "switchMs": [
+        7.700000002980232,
+        10,
+        14.400000005960464
+      ],
+      "parses": 1,
+      "parseMs": 0.7000000029802322,
+      "nodes": 743,
+      "images": 1,
+      "closedRecordNodes": 1,
+      "stable": true
+    },
+    {
+      "mode": "inline",
+      "language": "zh",
+      "htmlBytes": 500736,
+      "openMs": 52.80000001192093,
+      "switchMs": [
+        7.5999999940395355,
+        6.5999999940395355,
+        11.400000005960464
+      ],
+      "parses": 1,
+      "parseMs": 1.4000000059604645,
+      "nodes": 743,
+      "images": 1,
+      "closedRecordNodes": 1,
+      "stable": true
+    },
+    {
+      "mode": "inline",
+      "language": "en",
+      "htmlBytes": 565704,
+      "openMs": 64.69999998807907,
+      "switchMs": [
+        11.099999994039536,
+        10,
+        19.700000002980232
+      ],
+      "parses": 1,
+      "parseMs": 1.0999999940395355,
+      "nodes": 743,
+      "images": 1,
+      "closedRecordNodes": 1,
+      "stable": true
+    },
+    {
+      "mode": "bundle",
+      "language": "default",
+      "htmlBytes": 397756,
+      "openMs": 36.80000001192093,
+      "switchMs": [
+        9.200000002980232,
+        6.600000008940697,
+        13.399999991059303
+      ],
+      "parses": 1,
+      "parseMs": 0.5,
+      "nodes": 744,
+      "images": 1,
+      "closedRecordNodes": 1,
+      "stable": true
+    },
+    {
+      "mode": "bundle",
+      "language": "zh",
+      "htmlBytes": 397752,
+      "openMs": 22.100000008940697,
+      "switchMs": [
+        8.5,
+        7.399999991059303,
+        6.899999991059303
+      ],
+      "parses": 1,
+      "parseMs": 0.3999999910593033,
+      "nodes": 744,
+      "images": 1,
+      "closedRecordNodes": 1,
+      "stable": true
+    },
+    {
+      "mode": "bundle",
+      "language": "en",
+      "htmlBytes": 462720,
+      "openMs": 32,
+      "switchMs": [
+        13.799999997019768,
+        27.299999997019768,
+        20.200000002980232
+      ],
+      "parses": 1,
+      "parseMs": 0.800000011920929,
+      "nodes": 744,
+      "images": 1,
+      "closedRecordNodes": 1,
+      "stable": true
+    }
+  ],
+  "browserChecks": [
+    "原图解码、原尺寸、缩放、翻页、关闭返回",
+    "完整记录首次展开、关闭复用、切步骤保留DOM",
+    "前进、后退、刷新与步骤深链接",
+    "完整目录复制后 file:// 离线读图",
+    "缺失原件时卡片和原图查看器明确失败",
+    "单HTML独立解码Blob图像",
+    "本页没有HTTP资源请求",
+    "inline: 原图1280×720解码且CSP明确拒绝connect-src",
+    "inline: 切证据和完整筛选重绘保留输入展开状态",
+    "bundle: 原图1280×720解码且CSP明确拒绝connect-src",
+    "bundle: 切证据和完整筛选重绘保留输入展开状态"
+  ],
+  "caseReview": {
+    "parses": 1,
+    "scenes": 1,
+    "title": "合成 HTML 报告性能检查 · 用例审阅"
+  },
+  "engineering": {
+    "tests": 306,
+    "passed": 304,
+    "failed": 0,
+    "skipped": 2,
+    "skipReason": "Windows symlink creation privilege unavailable in two existing publication/package tests",
+    "typecheck": "passed",
+    "publicCheck": "passed",
+    "diffCheck": "passed"
+  },
+  "limitations": [
+    "Synthetic workload only; the user report was not provided.",
+    "Baseline measurements include one injected instrumentation script in HTML size; optimized htmlBytes refer to the original generated HTML.",
+    "No image thumbnail generation, search indexing or conversation batching was implemented.",
+    "No host installation, remote push or release was performed."
+  ]
+}

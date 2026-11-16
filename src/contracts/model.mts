@@ -68,7 +68,7 @@ export interface Preview {
 }
 export interface ReportAsset {
   kind: 'image' | 'text'; mediaType: string; bytes: number; retainedBytes: number; truncated: boolean;
-  data?: string; text?: string;
+  data?: string; text?: string; attachmentPath?: string;
 }
 export interface ReportDelivery {
   mode: 'inline' | 'bundle'; textPreviewLimitBytes: number; complete: boolean; allowMissingScreenshots: boolean;

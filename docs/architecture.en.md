@@ -1,6 +1,6 @@
-# Architecture — v9 / 0.2.1
+# Architecture — v9 / 0.2.2-rc.1
 
-0.2.1 is the release version. The Skill/package is ai-testing-ego-lite; storage remains v9. Bounded progress/context outputs use contextReadVersion 1; CLI record wraps the unchanged receipt in recordResponseVersion 1. Explicit usage exports are independent of business results. See [current design](v0.2.1-design.md) and [release validation](v0.2.1-release-validation.md).
+0.2.2-rc.1 is an unpublished development version. HTML performance changes and validation are documented in the [0.2.2 plan](v0.2.2-report-performance.md). The Skill/package is ai-testing-ego-lite; storage remains v9. Bounded progress/context outputs use contextReadVersion 1; CLI record wraps the unchanged receipt in recordResponseVersion 1. Explicit usage exports are independent of business results. See [current design](v0.2.1-design.md) and [release validation](v0.2.1-release-validation.md).
 
 
 ![Architecture responsibilities: AI, Ego and deterministic tools.](images/architecture.png)

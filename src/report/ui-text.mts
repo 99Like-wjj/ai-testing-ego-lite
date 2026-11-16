@@ -3,13 +3,32 @@ export interface Presentation { language: string; messages: Record<string, strin
 let resolver: (() => Presentation | undefined) | undefined;
 export function installUiResolver(value: () => Presentation | undefined): void { resolver = value; }
 let browserPresentation: Presentation | undefined;
+let browserPresentationLoaded = false;
+const embeddedData = new Map<string, { value?: unknown; error?: unknown }>();
+/** Immutable offline document data, shared by localization and the page entry point. */
+export function readEmbeddedData<T>(id: string): T | undefined {
+  let cached = embeddedData.get(id);
+  if (!cached) {
+    const doc = (globalThis as unknown as {document?: {getElementById(id: string): {textContent: string | null} | null}}).document;
+    const node = doc?.getElementById(id);
+    if (!node) return undefined;
+    try { cached = { value: JSON.parse(node.textContent ?? '{}') }; }
+    catch (error) { cached = { error }; }
+    embeddedData.set(id, cached);
+  }
+  if ('error' in cached) throw cached.error;
+  return cached.value as T;
+}
 function current(): Presentation | undefined {
   if (resolver) return resolver();
   const document=(globalThis as unknown as {document?:{getElementById(id:string):{textContent:string|null}|null}}).document;
   if (!document) return undefined;
-  if (!browserPresentation) {
-    const node = document.getElementById('report-data') ?? document.getElementById('case-data');
-    if (node) { const value = JSON.parse(node.textContent ?? '{}'); browserPresentation = value.report?.presentation ?? value.presentation; }
+  if (!browserPresentationLoaded) {
+    try {
+      type PageData = { report?: { presentation?: Presentation }; presentation?: Presentation };
+      const value = readEmbeddedData<PageData>('report-data') ?? readEmbeddedData<PageData>('case-data');
+      if (value) { browserPresentation = value.report?.presentation ?? value.presentation; browserPresentationLoaded = true; }
+    } catch { browserPresentationLoaded = true; /* The page entry point displays the cached parse error. */ }
   }
   return browserPresentation;
 }
